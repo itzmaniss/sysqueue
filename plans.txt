@@ -1,0 +1,81 @@
+add cron
+add scheduler
+
+
+Day 1 → Define your core types: Job, Worker, Queue structs + methods + interfaces
+Day 2 → Make them concurrent: goroutines, channels, mutex on your actual queue
+Day 3 → Process supervisor wrapping your worker processes
+Day 4 → TCP layer (optional, mostly standalone — but good to do)
+Day 5 → HTTP layer on top of your real queue
+Day 6 → Wire it all together, add metrics endpoint
+Day 7 → Harden what you built
+
+
+Day 1 – Go Fundamentals (Fast Track)
+Focus only on:
+Structs
+Methods
+Interfaces
+Pointers
+Error handling
+Skip basics like loops.
+Goal: Think in Go, not classes.
+Day 2 – Concurrency Deep Dive
+Master:
+Goroutines
+Channels
+Worker pools
+Context cancellation
+sync.Mutex
+Race detector
+Build:
+Concurrent job processor
+This is foundational for backend in Go.
+Day 3 – Build a Process Supervisor (Systems Angle)
+Use:
+exec.Command
+Signals
+Graceful shutdown
+Restart logic
+This gives you systems-level grounding.
+Day 4 – Raw Networking
+Before touching HTTP frameworks:
+Write a TCP server using net
+Handle connections manually
+Parse basic protocol
+Understand the boundary.
+Day 5 – HTTP Without Framework
+Use only:
+net/http
+No Gin.
+No Echo.
+Build:
+Simple JSON API
+Middleware manually
+Logging
+Request context
+Timeout handling
+Now you understand backend without abstraction.
+Day 6 – Real Backend Architecture
+Now build:
+A Concurrent Job Queue API
+Endpoints:
+POST /jobs
+GET /jobs/:id
+GET /metrics
+Internally:
+Worker pool
+In-memory store
+Mutex-protected map
+Graceful shutdown
+Context propagation
+Now backend meets concurrency.
+Day 7 – Make It Production-Like
+Add:
+Structured logging
+Request IDs
+Rate limiting
+Health endpoint
+Profiling endpoint (/debug/pprof)
+Graceful shutdown
+Dockerfile
