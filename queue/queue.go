@@ -4,18 +4,21 @@ import (
 	"sync"
 
 	"github.com/itzmaniss/sysqueue/job"
+	"github.com/itzmaniss/sysqueue/metrics"
 )
 
 type Queue struct {
 	JobQueue chan job.Job
 	Jobs     map[string]job.Job
 	Lock     sync.Mutex
+	Metrics  *metrics.Metrics
 }
 
-func NewQueue() *Queue {
+func NewQueue(metrics *metrics.Metrics) *Queue {
 	return &Queue{
 		JobQueue: make(chan job.Job),
 		Jobs:     make(map[string]job.Job),
+		Metrics:  metrics,
 	}
 }
 

@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/itzmaniss/sysqueue/job"
+	"github.com/itzmaniss/sysqueue/metrics"
 )
 
 type WorkerState string
@@ -28,15 +30,17 @@ type Worker struct {
 	JobQueue chan job.Job
 	Jobs     map[string]job.Job
 	Lock     *sync.Mutex
+	Metrics  *metrics.Metrics
 }
 
-func NewWorker(jobQueue chan job.Job, jobs map[string]job.Job, lock *sync.Mutex) Worker {
+func NewWorker(jobQueue chan job.Job, jobs map[string]job.Job, lock *sync.Mutex, metrics *metrics.Metrics) Worker {
 	return Worker{
 		ID:       uuid.NewString(),
 		State:    WorkerIdle,
 		JobQueue: jobQueue,
 		Jobs:     jobs,
 		Lock:     lock,
+		Metrics:  metrics,
 	}
 }
 
@@ -65,10 +69,11 @@ func (w *Worker) Start(ctx context.Context, wg *sync.WaitGroup, idx int) {
 				w.updateJob(j)
 				err = cmd.Wait()
 			}
-
+			atomic.AddInt64(&w.Metrics.JobsProcessed, 1)
 			if err != nil {
 				log.Println(err)
 				j.State = job.StateFailed
+				atomic.AddInt64(&w.Metrics.JobsFailed, 1)
 			} else {
 				j.State = job.StateDone
 			}

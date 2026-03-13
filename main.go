@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/itzmaniss/sysqueue/metrics"
 	"github.com/itzmaniss/sysqueue/queue"
 	"github.com/itzmaniss/sysqueue/server"
 	"github.com/itzmaniss/sysqueue/worker"
@@ -17,15 +18,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	q := queue.NewQueue()
+	m := metrics.NewMetrics()
+	q := queue.NewQueue(m)
 
 	for i := range 3 {
-		w := worker.NewWorker(q.JobQueue, q.Jobs, &q.Lock)
+		w := worker.NewWorker(q.JobQueue, q.Jobs, &q.Lock, m)
 		wg.Add(1)
 		go w.Start(ctx, &wg, i+1)
 	}
 
-	server := server.NewServer(q)
+	server := server.NewServer(q, m)
 	wg.Add(1)
 	go server.Start(ctx, &wg)
 

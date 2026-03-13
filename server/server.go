@@ -5,20 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"sync"
+	"sync/atomic"
 
 	"github.com/itzmaniss/sysqueue/job"
+	"github.com/itzmaniss/sysqueue/metrics"
 	"github.com/itzmaniss/sysqueue/queue"
+	"golang.org/x/time/rate"
 )
 
 type Server struct {
-	queue  *queue.Queue
-	server *http.Server
+	queue   *queue.Queue
+	metrics *metrics.Metrics
+	server  *http.Server
+	limiter *rate.Limiter
 }
 
-func NewServer(q *queue.Queue) *Server {
+func NewServer(q *queue.Queue, m *metrics.Metrics) *Server {
 	return &Server{
-		queue: q,
+		queue:   q,
+		metrics: m,
+		limiter: rate.NewLimiter(rate.Limit(10), 20),
 	}
 }
 
@@ -33,10 +41,14 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 	mux.HandleFunc("POST /jobs", s.PostJobs)
 	mux.HandleFunc("GET /jobs/{id}", s.GetJob)
 	mux.HandleFunc("DELETE /jobs/{id}", s.DeleteJob)
+	mux.HandleFunc("GET /health", s.HealthCheck)
+	mux.HandleFunc("GET /metrics", s.GetMetrics)
+
+	mux.Handle("/debug/pprof/", http.DefaultServeMux)
 
 	s.server = &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: s.rateLimitMiddleware(mux),
 	}
 
 	go s.server.ListenAndServe()
@@ -97,4 +109,28 @@ func (s *Server) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	delete(s.queue.Jobs, id)
 	s.queue.Lock.Unlock()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) GetMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{
+		"jobs_processed": atomic.LoadInt64(&s.metrics.JobsProcessed),
+		"jobs_failed":    atomic.LoadInt64(&s.metrics.JobsFailed),
+		"jobs_pending":   int64(len(s.queue.Jobs)),
+	})
+}
+
+func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.limiter.Allow() {
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
